@@ -28,19 +28,14 @@ namespace SandwichApi.Logic
     }
 
     public class TransactionGetModel
-    {
-        public TransactionGetModel()
-        {
-            LinkedTransactions = new List<TransactionGetModel>();
-        }
+    {        
         public string UserCode { get; set; }
         public string Sandwich { get; set; }
         public TransactionType Type { get; set; }
         public decimal Amount { get; set; }
         public DateTime Date { get; set; }
         public string Comment { get; set; }
-
-        public IEnumerable<TransactionGetModel> LinkedTransactions { get; set; }
+        public int? ParentId {get; set;}
         public int Id { get; internal set; }
     }
 
@@ -68,7 +63,20 @@ namespace SandwichApi.Logic
         }
         public IEnumerable<TransactionGetModel> GetAll()
         {
-            return _db.Transactions.Where(x => x.ParentId == null).ToList().Select(x => FromModel(x));
+
+            return from transaction in _db.Transactions
+                    join user in _db.Users on transaction.UserId equals user.Id
+                    select new TransactionGetModel() {
+                        Id = transaction.Id,
+                        ParentId = transaction.ParentId,
+                        Type = transaction.Type,
+                        Amount = transaction.Amount,
+                        Comment = transaction.Comment,
+                        Date = transaction.Date,
+                        Sandwich = transaction.Sandwich.Name,
+                        UserCode = transaction.User.Code
+                    };
+            
         }
 
         public Transaction GetById(int id)
@@ -107,17 +115,14 @@ namespace SandwichApi.Logic
             if (transaction == null)
                 return null;
 
-            var children = _db.Transactions.Where(x => x.ParentId == transaction.Id).ToList().Select(x => FromModel(x));
+          
 
             var rtn = new TransactionGetModel();
             rtn.Id = transaction.Id;
             rtn.Amount = transaction.Amount;
             rtn.Comment = transaction.Comment;
             rtn.Date = transaction.Date;
-            rtn.LinkedTransactions = children;
-            if (transaction.SandwichId != null)
-                rtn.Sandwich = _sandwichLogic.GetById(transaction.SandwichId.Value).Name;
-
+            rtn.ParentId = transaction.ParentId;
             rtn.Type = transaction.Type;
             rtn.UserCode = _userLogic.GetById(transaction.UserId).Code;
             return rtn;
